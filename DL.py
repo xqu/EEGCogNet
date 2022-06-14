@@ -7,7 +7,7 @@ import copy
 import math
 
 
-class EEGCogNet(Dataset):
+class EEGCogNet_DL(Dataset):
   def __init__(self, npdata):
     self.len = npdata.shape[0]
 
@@ -43,9 +43,9 @@ def train_loop(epoch, train_loader, model, criterion, optimizer, device):
       #Add parameter to automize this 
       model.double()
       #For LSTM and CNN use the following line
-      #output = model(X) 
+      output = model(X) 
       #For EEG_Transformer use the following line
-      output, _ = model(X)
+      #output, _ = model(X)
       loss = criterion(output, y.long())
 
       # Backpropagation and optimization 

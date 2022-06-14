@@ -11,6 +11,13 @@ from time import time
 # metrics are used to find accuracy or error
 from sklearn import metrics
 
+#####################
+BATCH_SIZE = 64 #Choose batch size for deep learning training process
+NUM_PROCESS = 2 #Choose how many CPU cores are used for training neural networks
+INCLUDE_DL = False #Choose whether to run DL benchmark. This requires PyTorch
+DL_Models = ['cnn', 'lstm'] #Currently also support attention-based transformer, simply add 'transformer' to this list.
+#####################
+
 data_source = 'tcr'
 subject_id_start = 1
 subject_id_end = 17 # tcr's max 17; rwt's max 14
@@ -307,6 +314,43 @@ for i in range(subject_id_start, subject_id_end + 1):
         subject_prediction[str(subject_id)][name]["predicted_y"] = y_predict
         dicts_record[str(subject_id)] = accuracy
         print("The accuracy of subject", subject_id, "is", accuracy, "with the model " + name)
+
+    if INCLUDE_DL:
+        for name in DL_Models:
+            accs = []
+            t0 = time()
+            execute_counter = 1
+            for i in range(len(folds_list)):
+
+                folds.append(folds.pop(0))
+                data = pd.concat(folds[:-1])
+                index = data.index.tolist()
+                index_remove = index_to_be_removed.copy()
+                index_remove = [i for i in index_remove if i in index]
+
+                data = data.drop(labels=index_remove, axis=0)
+                npdata = np.array(data)
+                tcr = DL.EEGCogNet_DL(npdata)
+                train_loader = DataLoader(dataset = tcr, batch_size = BATCH_SIZE, shuffle = True, num_workers=NUM_PROCESS)
+
+                model = DL.DL_Model(name, BATCH_SIZE)
+                model.fit(train_loader)
+
+                data_test = folds[-1]
+                testdata = np.array(data_test)
+                tcr_test = DL.EEGCogNet_DL(testdata)
+                test_loader = DataLoader(dataset = tcr_test, batch_size = BATCH_SIZE, shuffle = False, num_workers = NUM_PROCESS)
+                cur_accuracy = test_loop(test_loader, model.net)
+
+                accs.append(cur_accuracy)
+
+            t1 = time()
+            time_elapsed = t1 - t0
+            print()
+            print("The time it takes to run " + name + " is", time_elapsed)
+            average_accuracy = sum(accs) / (float)len(folds_list)
+            print("The accuracy of subject", subject_id, "is",average_accuracy, "with the model " + name)
+
 
 print("Dicts_order is:")
 for name, dicts_record in zip(names, dicts_records):
