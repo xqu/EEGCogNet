@@ -10,7 +10,7 @@ from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 from time import time
 # metrics are used to find accuracy or error
 from sklearn import metrics
-#The following methods are used in DL
+# The following methods are used in DL
 import torch
 from torch import nn
 from torch.utils.data import Dataset
@@ -21,17 +21,19 @@ import math
 import DL
 
 #####################
-BATCH_SIZE = 64 #Choose batch size for deep learning training process
-NUM_PROCESS = 2 #Choose how many CPU cores are used for training neural networks
-INCLUDE_DL = False #Choose whether to run DL benchmark. This requires PyTorch
-DL_Models = ['cnn', 'lstm'] #Currently also support attention-based transformer, simply add 'transformer' to this list.
+BATCH_SIZE = 64  # Choose batch size for deep learning training process
+NUM_PROCESS = 2  # Choose how many CPU cores are used for training neural networks
+INCLUDE_DL = False  # Choose whether to run DL benchmark. This requires PyTorch
+# Currently also support attention-based transformer, simply add 'transformer' to this list.
+DL_Models = ['cnn', 'lstm']
 #####################
 
 data_source = 'rwt'
 subject_id_start = 1
-subject_id_end = 14 # tcr's max 17; rwt's max 14
+subject_id_end = 14  # tcr's max 17; rwt's max 14
 data_status = 'old_'
-tcr_subject = [7, 112, 113, 121, 75, 107, 79, 82, 118, 76, 115, 117, 119, 120, 105, 78, 124]
+tcr_subject = [7, 112, 113, 121, 75, 107, 79, 82,
+               118, 76, 115, 117, 119, 120, 105, 78, 124]
 rwt_subject = [7, 112, 113, 114, 75, 107, 79, 82, 118, 76, 115, 117, 119, 120]
 new_tcr_trial = [123, 124]
 subject = None
@@ -60,13 +62,15 @@ RUSBoost = {}
 LDA = {}
 sLDA = {}
 
-subject_preprocess_record = {} # records the number of sessions and folds left for each subjects
+# records the number of sessions and folds left for each subjects
+subject_preprocess_record = {}
 
 subject_prediction = {}
 
 subject_unknown_percentage = {}
 
-time_classifier = {} # records the time it takes for each classifier to execute the 7-fold cross-validation
+# records the time it takes for each classifier to execute the 7-fold cross-validation
+time_classifier = {}
 # define models to train
 # define models to train
 names = [
@@ -77,7 +81,7 @@ names = [
     'RandomForest',
     "Linear SVM",
     "RBF SVM",
-     "Decision Tree",
+    "Decision Tree",
     'Shrinkage LDA',
 ]
 
@@ -87,7 +91,8 @@ classifiers = [
     LinearDiscriminantAnalysis(),
     KNeighborsClassifier(n_neighbors=5),
     AdaBoostClassifier(),
-    RandomForestClassifier(n_estimators=300, max_features="sqrt", oob_score=True),
+    RandomForestClassifier(
+        n_estimators=300, max_features="sqrt", oob_score=True),
     SVC(kernel="linear", C=0.025),
     SVC(gamma=2, C=1),
     DecisionTreeClassifier(),
@@ -95,23 +100,25 @@ classifiers = [
 ]
 
 dicts_records = [
-                 GradientBoost,
-                 LDA,
-                 NearestNeighbor,
-                 AdaBoost,
-                 RandomForest,
-                 LinearSVM,
-                 RBFSVM,
-                 DecisionTree,
-                 sLDA
-                ]
+    GradientBoost,
+    LDA,
+    NearestNeighbor,
+    AdaBoost,
+    RandomForest,
+    LinearSVM,
+    RBFSVM,
+    DecisionTree,
+    sLDA
+]
 
 
 def check_removed_index(name, removed_dict, index_to_be_removed, lowerBound, upperBound):
     if name not in removed_dict:
         removed_dict[name] = 0
-    lst = [i for i in index_to_be_removed if i >= lowerBound and i < upperBound]
+    lst = [i for i in index_to_be_removed if i >=
+           lowerBound and i < upperBound]
     removed_dict[name] = removed_dict[name] + len(lst)
+
 
 def calculate_accuracy(y_actual, y_predict):
     count = 0
@@ -119,6 +126,7 @@ def calculate_accuracy(y_actual, y_predict):
         if y_actual[i] == y_predict[i]:
             count = count + 1
     return count / float(len(y_actual))
+
 
 def check_plateau(dataFrame, current_index):
     for i in range(current_index + 1, current_index + 14):
@@ -128,6 +136,7 @@ def check_plateau(dataFrame, current_index):
         if sum(lst) != 0:
             return False
     return True
+
 
 print(len(subject))
 
@@ -139,7 +148,7 @@ for i in range(subject_id_start, subject_id_end + 1):
     frame = []
     for session in range(1, 7):
         data_one = pd.read_csv(
-            'data_preprocess/' + data_status + data_source + '_plateau_removed_data/' + data_source + "_subject_" + str(
+            'data/RWT_processed/' + data_source + "_subject_" + str(
                 subject_id) + "_session_" + str(session) + ".csv",
             header=None)
         zeros = [0] * 20
@@ -149,7 +158,8 @@ for i in range(subject_id_start, subject_id_end + 1):
         data_one = data_one.iloc[0:3000]
         temp_frame = []
         for i in range(5):
-            temp = data_one.iloc[int(i * 600 + first_chopped_off): int((i + 1) * 600 - last_chopped_off)]
+            temp = data_one.iloc[int(
+                i * 600 + first_chopped_off): int((i + 1) * 600 - last_chopped_off)]
             temp_frame.append(temp)
         data_one = pd.concat(temp_frame)
         frame.append(data_one)
@@ -185,14 +195,17 @@ for i in range(subject_id_start, subject_id_end + 1):
     data["ground_truth"] = session_all
 
     # check if the subject should be kept
-    percentage_removed_total = (int(18000 * 0.7) - len(index_to_be_removed)) / 18000.0
-    print("percentage of data left for subject", subject_id, "is", percentage_removed_total)
+    percentage_removed_total = (
+        int(18000 * 0.7) - len(index_to_be_removed)) / 18000.0
+    print("percentage of data left for subject",
+          subject_id, "is", percentage_removed_total)
     if percentage_removed_total < 0.35:
         print("the subject", subject_id, "should be removed and will be ignored")
         continue
     if str(subject_id) not in subject_unknown_percentage:
         subject_unknown_percentage[str(subject_id)] = {}
-    subject_unknown_percentage[str(subject_id)]["known"] = percentage_removed_total
+    subject_unknown_percentage[str(
+        subject_id)]["known"] = percentage_removed_total
     subject_preprocess_record[str(subject_id)] = {}
 
     # checks each six session:
@@ -201,10 +214,13 @@ for i in range(subject_id_start, subject_id_end + 1):
     for session in range(0, 6):
         session_lowerbound = 2100 * session
         session_upperbound = 2100 * (session + 1)
-        to_be_removed = [i for i in index_to_be_removed if i >= session_lowerbound and i < session_upperbound]
-        print("Number of rows to be removed for session", (session + 1), "is", len(to_be_removed))
+        to_be_removed = [i for i in index_to_be_removed if i >=
+                         session_lowerbound and i < session_upperbound]
+        print("Number of rows to be removed for session",
+              (session + 1), "is", len(to_be_removed))
         percentage_remained = (2100 - (len(to_be_removed))) / 3000.0
-        print("percent of rows left in sesssion", (session + 1), "is", percentage_remained)
+        print("percent of rows left in sesssion",
+              (session + 1), "is", percentage_remained)
         if percentage_remained < 0.35:
             session_list.remove(session)
             print("session", session, " should be removed and will be ignored")
@@ -214,18 +230,20 @@ for i in range(subject_id_start, subject_id_end + 1):
         print("all sessions are ignored. Continue to next person")
         continue
 
-    subject_preprocess_record[str(subject_id)]["session_remained"] = len(session_list)
+    subject_preprocess_record[str(
+        subject_id)]["session_remained"] = len(session_list)
 
     # cut 7 folds
-    test1data = [];
-    test2data = [];
-    test3data = [];
-    test4data = [];
-    test5data = [];
-    test6data = [];
-    test7data = [];
+    test1data = []
+    test2data = []
+    test3data = []
+    test4data = []
+    test5data = []
+    test6data = []
+    test7data = []
     removed_dict = {}
-    fold_names = ["fold1", "fold2", "fold3", "fold4", "fold5", "fold6", "fold7"]
+    fold_names = ["fold1", "fold2", "fold3",
+                  "fold4", "fold5", "fold6", "fold7"]
     # for each move (420 lines), split the data into seven folds
     # at the same time, record the number of lines being that would be omited
     # remove folds that have less than 33.33% data remained
@@ -237,25 +255,34 @@ for i in range(subject_id_start, subject_id_end + 1):
     for i in move_lst:
         lowerBound = i * 420
         test1data.append(data.iloc[lowerBound: lowerBound + 60])
-        check_removed_index("fold1", removed_dict, index_to_be_removed, lowerBound, lowerBound + 60)
+        check_removed_index("fold1", removed_dict,
+                            index_to_be_removed, lowerBound, lowerBound + 60)
         test2data.append(data.iloc[lowerBound + 60: lowerBound + 120])
-        check_removed_index("fold2", removed_dict, index_to_be_removed, lowerBound + 60, lowerBound + 120)
+        check_removed_index(
+            "fold2", removed_dict, index_to_be_removed, lowerBound + 60, lowerBound + 120)
         test3data.append(data.iloc[lowerBound + 120: lowerBound + 180])
-        check_removed_index("fold3", removed_dict, index_to_be_removed, lowerBound + 120, lowerBound + 180)
+        check_removed_index(
+            "fold3", removed_dict, index_to_be_removed, lowerBound + 120, lowerBound + 180)
         test4data.append(data.iloc[lowerBound + 180: lowerBound + 240])
-        check_removed_index("fold4", removed_dict, index_to_be_removed, lowerBound + 180, lowerBound + 240)
+        check_removed_index(
+            "fold4", removed_dict, index_to_be_removed, lowerBound + 180, lowerBound + 240)
         test5data.append(data.iloc[lowerBound + 240: lowerBound + 300])
-        check_removed_index("fold5", removed_dict, index_to_be_removed, lowerBound + 240, lowerBound + 300)
+        check_removed_index(
+            "fold5", removed_dict, index_to_be_removed, lowerBound + 240, lowerBound + 300)
         test6data.append(data.iloc[lowerBound + 300: lowerBound + 360])
-        check_removed_index("fold6", removed_dict, index_to_be_removed, lowerBound + 300, lowerBound + 360)
+        check_removed_index(
+            "fold6", removed_dict, index_to_be_removed, lowerBound + 300, lowerBound + 360)
         test7data.append(data.iloc[lowerBound + 360: lowerBound + 420])
-        check_removed_index("fold7", removed_dict, index_to_be_removed, lowerBound + 360, lowerBound + 420)
+        check_removed_index(
+            "fold7", removed_dict, index_to_be_removed, lowerBound + 360, lowerBound + 420)
 
-    folds_list = [test1data, test2data, test3data, test4data, test5data, test6data, test7data]
+    folds_list = [test1data, test2data, test3data,
+                  test4data, test5data, test6data, test7data]
     # check folds percentages
     for name in fold_names:
         removed_num = removed_dict[name]
-        remained_percentage = (((2100 * len(session_list)) / 7.0) - removed_num) / ((3000 * len(session_list)) / 7.0)
+        remained_percentage = (((2100 * len(session_list)) / 7.0) -
+                               removed_num) / ((3000 * len(session_list)) / 7.0)
         print()
         print("the " + name + " has", remained_percentage, "left")
         print()
@@ -322,7 +349,8 @@ for i in range(subject_id_start, subject_id_end + 1):
         subject_prediction[str(subject_id)][name]["acutual_y"] = y_test
         subject_prediction[str(subject_id)][name]["predicted_y"] = y_predict
         dicts_record[str(subject_id)] = accuracy
-        print("The accuracy of subject", subject_id, "is", accuracy, "with the model " + name)
+        print("The accuracy of subject", subject_id,
+              "is", accuracy, "with the model " + name)
 
     if INCLUDE_DL:
         for name in DL_Models:
@@ -340,7 +368,8 @@ for i in range(subject_id_start, subject_id_end + 1):
                 data = data.drop(labels=index_remove, axis=0)
                 npdata = np.array(data)
                 tcr = DL.EEGCogNet_DL(npdata)
-                train_loader = DataLoader(dataset = tcr, batch_size = BATCH_SIZE, shuffle = True, num_workers=NUM_PROCESS)
+                train_loader = DataLoader(
+                    dataset=tcr, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_PROCESS)
 
                 model = DL.DL_Model(name, BATCH_SIZE)
                 model.fit(train_loader)
@@ -348,7 +377,8 @@ for i in range(subject_id_start, subject_id_end + 1):
                 data_test = folds[-1]
                 testdata = np.array(data_test)
                 tcr_test = DL.EEGCogNet_DL(testdata)
-                test_loader = DataLoader(dataset = tcr_test, batch_size = BATCH_SIZE, shuffle = False, num_workers = NUM_PROCESS)
+                test_loader = DataLoader(
+                    dataset=tcr_test, batch_size=BATCH_SIZE, shuffle=False, num_workers=NUM_PROCESS)
                 cur_accuracy = test_loop(test_loader, model.net)
 
                 accs.append(cur_accuracy)
@@ -358,8 +388,8 @@ for i in range(subject_id_start, subject_id_end + 1):
             print()
             print("The time it takes to run " + name + " is", time_elapsed)
             average_accuracy = sum(accs) / (float)len(folds_list)
-            print("The accuracy of subject", subject_id, "is",average_accuracy, "with the model " + name)
-
+            print("The accuracy of subject", subject_id, "is",
+                  average_accuracy, "with the model " + name)
 
 
 print("Dicts_order is:")
@@ -384,7 +414,8 @@ print("the dictionary for the best classifier is: ")
 print(best_classifier_dict)
 print()
 
-dict_sum_recorder = dict(sorted(dict_sum_recorder.items(), key=lambda item: -item[1]))
+dict_sum_recorder = dict(
+    sorted(dict_sum_recorder.items(), key=lambda item: -item[1]))
 print("The dic_sum_recorder is")
 print(dict_sum_recorder)
 print()
@@ -392,8 +423,10 @@ classifier_order = list(dict_sum_recorder.keys())
 print("the order of the classifier is: ")
 print(classifier_order)
 print()
-best_classifier_dict_sorted = dict(sorted(best_classifier_dict.items(), key=lambda item: -item[1]))
-subject_id_order = list(best_classifier_dict_sorted.keys())  # The x axis of the plot
+best_classifier_dict_sorted = dict(
+    sorted(best_classifier_dict.items(), key=lambda item: -item[1]))
+# The x axis of the plot
+subject_id_order = list(best_classifier_dict_sorted.keys())
 print("best_classifier_dict_sorted is: ")
 print(best_classifier_dict_sorted)
 print()
@@ -431,14 +464,15 @@ for i in range(len(result_y_res)):
         label_name = "KNN"
     if label_name == "AdaBoostClassifier":
         label_name = "AdaBoost"
-    ax.plot(x_axis, y, marker='D', label = label_name + "(" + str(temp_avg)+")")
+    ax.plot(x_axis, y, marker='D', label=label_name + "(" + str(temp_avg)+")")
 
-ax.set_position([0.1,0.5, 1.2, 1.0])
+ax.set_position([0.1, 0.5, 1.2, 1.0])
 ax.legend(loc='upper left')
 plt.axhline(y=0.2, color='r', linestyle=':')
 plt.xticks(fontsize=15)
 plt.yticks(fontsize=15)
 plt.xlabel('Subject ID orderd by ' + best_classifier_name, fontsize=15)
 plt.ylabel('Accuracy', fontsize=15)
-plt.savefig("output/"+data_source + "_" +data_status+"results/algorithm_comparison_each_subject.jpg", bbox_inches='tight', dpi = 2000)
+plt.savefig("output/"+data_source + "_" + data_status +
+            "results/algorithm_comparison_each_subject.jpg", bbox_inches='tight', dpi=2000)
 plt.show()

@@ -11,7 +11,7 @@ from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 # metrics are used to find accuracy or error
 from sklearn import metrics
 
-data_folder_name = "Python_Math_2018"
+data_folder_name = "Raw_Python_Math"
 
 plateau_threashold = 14
 
@@ -27,7 +27,7 @@ def combine_folds(folds_dict, fold_num):
 
 ## checks if the file_name exists in the folder_name
 def check_file_exists(folder_name, file_name):
-    return os.path.exists(folder_name + "/" + file_name)
+    return os.path.exists("data/"+ folder_name + "/" + file_name)
 
 
 # compares two rows to see if they are the same in the pandas dataframe
@@ -167,9 +167,9 @@ for subject_id in range(subject_id_start, subject_id_end + 1):
         read_file = None
         if file_exists:
             if subject_id_num == 66 and session == 1:
-                read_file = pd.read_csv(data_folder_name + '/' + file_name, sep=",", header=None)
+                read_file = pd.read_csv("data/" + data_folder_name + '/' + file_name, sep=",", header=None)
             else:
-                read_file = pd.read_csv(data_folder_name + '/' + file_name, delim_whitespace=True, header=None)
+                read_file = pd.read_csv("data/" + data_folder_name + '/' + file_name, delim_whitespace=True, header=None)
             read_file = read_file.iloc[:, 1:]
             if len(read_file) > 12000:
                 read_file = read_file.iloc[:12000, :]

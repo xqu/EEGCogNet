@@ -73,7 +73,7 @@ conda install pytorch torchvision torchaudio -c pytorch
 Note the stable version of PyTorch (1.11.0) does not support M1 Mac. Please download the Preview version, which is also compatible with the EEGCogNet codebase. 
 
 ## Evaluating the Benchmark and Baseline
-First, you should create these four directories: output/Python_Math_2018, output/Raw_2018, output/rwt_old_results, and output/tcr_old_results so that the results for Python_Math, GRE_Relax, RWT, and TCR will be generated in these directories, respectively.
+First, you should create these four directories: output/Raw_Python_Math, output/GRE_Raw, output/rwt_old_results, and output/tcr_old_results so that the results for Python_Math, GRE_Relax, RWT, and TCR will be generated in these directories, respectively.
 
 Then, activate the EEGCogNet conda environment:
 ```

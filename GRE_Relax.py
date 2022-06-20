@@ -11,7 +11,7 @@ from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 # metrics are used to find accuracy or error
 from sklearn import metrics
 
-data_folder_name = "Raw_2018"
+data_folder_name = "GRE_Raw"
 
 plateau_threashold = 14
 
@@ -25,9 +25,9 @@ def combine_folds(folds_dict, fold_num):
     return res
 
 
-## checks if the file_name exists in the folder_name
+# checks if the file_name exists in the folder_name
 def check_file_exists(folder_name, file_name):
-    return os.path.exists(folder_name + "/" + file_name)
+    return os.path.exists("data/" + folder_name + "/" + file_name)
 
 
 # compares two rows to see if they are the same in the pandas dataframe
@@ -128,7 +128,8 @@ classifiers = [
     LinearDiscriminantAnalysis(),
     KNeighborsClassifier(n_neighbors=4),
     AdaBoostClassifier(),
-    RandomForestClassifier(n_estimators=300, max_features="sqrt", oob_score=True),
+    RandomForestClassifier(
+        n_estimators=300, max_features="sqrt", oob_score=True),
     SVC(kernel="linear", C=0.025),
     SVC(gamma=2, C=1),
     DecisionTreeClassifier(),
@@ -173,7 +174,8 @@ for subject_id in range(subject_id_start, subject_id_end + 1):
         file_exists = check_file_exists(data_folder_name, file_name)
         read_file = None
         if file_exists:
-            read_file = pd.read_csv(data_folder_name + '/' + file_name, delim_whitespace=True, header=None)
+            read_file = pd.read_csv(
+                "data/" + data_folder_name + '/' + file_name, delim_whitespace=True, header=None)
             read_file = read_file.iloc[:, 1:]
             if len(read_file) > 12000:
                 read_file = read_file.iloc[:12000, :]
@@ -252,7 +254,8 @@ for subject_id in range(subject_id_start, subject_id_end + 1):
         for i in range(6):
             starting = per_folds * i
             if i != 5:
-                folds_dict[i].append(task_data.iloc[starting: starting + per_folds])
+                folds_dict[i].append(
+                    task_data.iloc[starting: starting + per_folds])
             else:
                 folds_dict[i].append(task_data.iloc[starting:])
 
@@ -299,7 +302,8 @@ best_classifier_name = classifier_name[0]
 print("order of the classifier is", classifier_name)
 
 subject_id_order = [i for i in range(subject_id_start, subject_id_end + 1)]
-subject_id_order.sort(key=lambda x: subject_algorithms_dict[x][best_classifier_name])
+subject_id_order.sort(
+    key=lambda x: subject_algorithms_dict[x][best_classifier_name])
 print("subject id order is", subject_id_order)
 
 for key in algorithm_sum_dict:
@@ -321,7 +325,8 @@ for classifier in classifier_name:
         label_name = "KNN"
     if classifier == "AdaBoostClassifier":
         label_name = "AdaBoost"
-    ax.plot(x_axis, y, marker='D', label=label_name + "(" + str(round(algorithm_sum_dict[classifier], 2)) + ")")
+    ax.plot(x_axis, y, marker='D', label=label_name +
+            "(" + str(round(algorithm_sum_dict[classifier], 2)) + ")")
 
 ax.set_position([0.1, 0.5, 1.2, 1.0])
 ax.legend(loc='upper left')
@@ -331,5 +336,6 @@ plt.xticks(x_axis, subject_id_order, fontsize=15)
 plt.yticks(fontsize=15)
 plt.xlabel('Subject ID orderd by ' + best_classifier_name, fontsize=15)
 plt.ylabel('Accuracy', fontsize=15)
-plt.savefig("output/" + data_folder_name + "/algorithm_comparison_each_subject.jpg", bbox_inches='tight', dpi=1500)
+plt.savefig("output/" + data_folder_name +
+            "/algorithm_comparison_each_subject.jpg", bbox_inches='tight', dpi=1500)
 plt.show()
