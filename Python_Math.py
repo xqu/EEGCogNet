@@ -8,6 +8,8 @@ from sklearn.neighbors import KNeighborsClassifier
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.svm import SVC
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
+from xgboost import XGBClassifier
+import math
 # metrics are used to find accuracy or error
 from sklearn import metrics
 
@@ -107,31 +109,39 @@ def session_ground_truth(order, last_task_left):
     res_lst.extend([order[-1]] * last_task_left)
     return res_lst
 
+def calculate_sd(accuracies, mean):
+    sum_of_accuracies = 0
+    for acc in accuracies:
+        sum_of_accuracies += pow(acc-mean, 2)
+    sum_of_accuracies /= len(accuracies) - 1
+    return math.sqrt(sum_of_accuracies)
 
 # define models to train
 names = [
-    'GradientBoosting',
-    'LDA',
-    'Nearest Neighbors',
-    'AdaBoostClassifier',
-    'RandomForest',
-    'Linear SVM',
-    'RBF SVM',
-    'Decision Tree',
-    'Shrinkage LDA',
+    'XGBoost',
+    # 'GradientBoosting',
+    # 'LDA',
+    # 'Nearest Neighbors',
+    # 'AdaBoostClassifier',
+    # 'RandomForest',
+    # 'Linear SVM',
+    # 'RBF SVM',
+    # 'Decision Tree',
+    # 'Shrinkage LDA',
 ]
 
 # build classifiers
 classifiers = [
-    GradientBoostingClassifier(),
-    LinearDiscriminantAnalysis(),
-    KNeighborsClassifier(n_neighbors=4),
-    AdaBoostClassifier(),
-    RandomForestClassifier(n_estimators=300, max_features="sqrt", oob_score=True),
-    SVC(kernel="linear", C=0.025),
-    SVC(gamma=2, C=1),
-    DecisionTreeClassifier(),
-    LinearDiscriminantAnalysis(solver='lsqr', shrinkage='auto'),
+    XGBClassifier(eval_metric='mlogloss'),
+    # GradientBoostingClassifier(),
+    # LinearDiscriminantAnalysis(),
+    # KNeighborsClassifier(n_neighbors=4),
+    # AdaBoostClassifier(),
+    # RandomForestClassifier(n_estimators=300, max_features="sqrt", oob_score=True),
+    # SVC(kernel="linear", C=0.025),
+    # SVC(gamma=2, C=1),
+    # DecisionTreeClassifier(),
+    # LinearDiscriminantAnalysis(solver='lsqr', shrinkage='auto'),
 ]
 
 subject_id_lst = [66, 76, 79, 81, 101, 102, 103, 104, 106, 107, 108, 109, 110, 111, 112]
@@ -146,8 +156,8 @@ session_task_order = {}
 session_task_order[1] = [1, 2, 3, 4]
 session_task_order[2] = [3, 4, 1, 2]
 
-subject_id_start = 1
-subject_id_end = 15  # Python_Math max 15
+subject_id_start = 4
+subject_id_end = 4  # Python_Math max 15
 
 subject_algorithms_dict = {}
 
@@ -245,6 +255,7 @@ for subject_id in range(subject_id_start, subject_id_end + 1):
     models = zip(names, classifiers)
     for name, classifier in models:
         accuracy = 0
+        accuracy_list = []
         for fold_num in range(len(folds_dict)):
             data_train = combine_folds(folds_dict, fold_num)
             X = data_train.iloc[:, :-1]
@@ -255,11 +266,10 @@ for subject_id in range(subject_id_start, subject_id_end + 1):
             X_test = data_test.iloc[:, :-1]
             y_test = data_test.iloc[:, -1]
             y_predict = []
-            if name == "GradientBoostingRegressor":
-                accuracy += clf.score(X_test, y_test)
-            else:
-                y_predict = clf.predict(X_test)
-                accuracy += metrics.accuracy_score(y_test, y_predict)
+            y_predict = clf.predict(X_test)
+            temp_acc = metrics.accuracy_score(y_test, y_predict)
+            accuracy_list.append(temp_acc)
+            accuracy += temp_acc
         accuracy_dict[name] = accuracy / len(folds_dict)
 
     subject_algorithms_dict[subject_id] = accuracy_dict

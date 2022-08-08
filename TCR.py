@@ -1,47 +1,49 @@
 import pandas as pd
 import matplotlib.pyplot as plt
+import numpy as np
+from torch.utils.data import DataLoader
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.ensemble import AdaBoostClassifier
 from sklearn.ensemble import GradientBoostingClassifier
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.tree import DecisionTreeClassifier
+from xgboost import XGBClassifier
 from sklearn.svm import SVC
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 from time import time
+import math
+import DL
 # metrics are used to find accuracy or error
 from sklearn import metrics
 
 #####################
 BATCH_SIZE = 64  # Choose batch size for deep learning training process
 NUM_PROCESS = 2  # Choose how many CPU cores are used for training neural networks
-INCLUDE_DL = False  # Choose whether to run DL benchmark. This requires PyTorch
+INCLUDE_DL = True  # Choose whether to run DL benchmark. This requires PyTorch
 # Currently also support attention-based transformer, simply add 'transformer' to this list.
-DL_Models = ['cnn', 'lstm']
+DL_Models = ['CNN', 'LSTM']
 #####################
 
-data_source = 'tcr'
+data_source = 'TCR'
 subject_id_start = 1
 subject_id_end = 17  # tcr's max 17; rwt's max 14
-data_status = 'old_'
 tcr_subject = [7, 112, 113, 121, 75, 107, 79, 82,
                118, 76, 115, 117, 119, 120, 105, 78, 124]
 rwt_subject = [7, 112, 113, 114, 75, 107, 79, 82, 118, 76, 115, 117, 119, 120]
-new_tcr_trial = [123, 124]
 subject = None
-if data_status == "old_":
-    if data_source == 'tcr':
-        subject = tcr_subject
-    else:
-        subject = rwt_subject
+
+if data_source == 'tcr':
+    subject = tcr_subject
 else:
-    subject = new_tcr_trial
+    subject = rwt_subject
+
 first_chopped_off = 600 * 0.3
 last_chopped_off = 600 * 0
 
 Random_Forest_predicted_y = []
 RBF_SVM_predicted_y = []
 
-
+XGBoost = {}
 GradientBoost = {}
 NearestNeighbor = {}
 AdaBoost = {}
@@ -52,54 +54,60 @@ DecisionTree = {}
 RUSBoost = {}
 LDA = {}
 sLDA = {}
+CNN = {}
+LSTM = {}
 
 # records the number of sessions and folds left for each subjects
 subject_preprocess_record = {}
 
-subject_prediction = {}
-
 subject_unknown_percentage = {}
+
+# Records the standard deviation of each classifiers
+standard_deviation_record = {}
 
 # records the time it takes for each classifier to execute the 7-fold cross-validation
 time_classifier = {}
 # define models to train
 # define models to train
 names = [
-    'GradientBoosting',
-    'LDA',
-    'Nearest Neighbors',
-    'AdaBoostClassifier',
-    'RandomForest',
-    "Linear SVM",
-    "RBF SVM",
-    "Decision Tree",
-    "Shrinkage LDA",
+    # 'XGBoost',
+    # 'GradientBoosting',
+    # 'LDA',
+    # 'Nearest Neighbors',
+    # 'AdaBoostClassifier',
+    # 'RandomForest',
+    # "Linear SVM",
+    # "RBF SVM",
+    # "Decision Tree",
+    # "Shrinkage LDA",
 ]
 
 # build classifiers
 classifiers = [
-    GradientBoostingClassifier(),
-    LinearDiscriminantAnalysis(),
-    KNeighborsClassifier(n_neighbors=5),
-    AdaBoostClassifier(),
-    RandomForestClassifier(
-        n_estimators=300, max_features="sqrt", oob_score=True),
-    SVC(kernel="linear", C=0.025),
-    SVC(gamma=2, C=1),
-    DecisionTreeClassifier(),
-    LinearDiscriminantAnalysis(solver='lsqr', shrinkage='auto'),
+    # XGBClassifier(eval_metric='mlogloss'),
+    # GradientBoostingClassifier(),
+    # LinearDiscriminantAnalysis(),
+    # KNeighborsClassifier(n_neighbors=5),
+    # AdaBoostClassifier(),
+    # RandomForestClassifier(
+    #     n_estimators=300, max_features="sqrt", oob_score=True),
+    # SVC(kernel="linear", C=0.025),
+    # SVC(gamma=2, C=1),
+    # DecisionTreeClassifier(),
+    # LinearDiscriminantAnalysis(solver='lsqr', shrinkage='auto'),
 ]
 
 dicts_records = [
-    GradientBoost,
-    LDA,
-    NearestNeighbor,
-    AdaBoost,
-    RandomForest,
-    LinearSVM,
-    RBFSVM,
-    DecisionTree,
-    sLDA
+    # XGBoost,
+    # GradientBoost,
+    # LDA,
+    # NearestNeighbor,
+    # AdaBoost,
+    # RandomForest,
+    # LinearSVM,
+    # RBFSVM,
+    # DecisionTree,
+    # sLDA
 ]
 
 
@@ -128,6 +136,13 @@ def check_plateau(dataFrame, current_index):
             return False
     return True
 
+# Calculate the sample standard deviation given a list of accuracies
+def calculate_sd(accuracies, mean):
+    sum_of_accuracies = 0
+    for acc in accuracies:
+        sum_of_accuracies += pow(acc-mean, 2)
+    sum_of_accuracies /= len(accuracies) - 1
+    return math.sqrt(sum_of_accuracies)
 
 print(len(subject))
 
@@ -139,8 +154,7 @@ for i in range(subject_id_start, subject_id_end + 1):
     frame = []
     for session in range(1, 7):
         data_one = pd.read_csv(
-            'data/tcr_processed/' + data_source + "_subject_" +
-            str(subject_id) + "_session_" + str(session) + ".csv",
+             f"data/{data_source}/{data_source}_processed/{data_source.lower()}_subject_{str(subject_id)}_session_{str(session)}.csv",
             header=None)
         zeros = [0] * 20
 
@@ -284,23 +298,27 @@ for i in range(subject_id_start, subject_id_end + 1):
             del folds_list[idx]
             fold_names.remove(name)
     folds = []
-    print(removed_dict)
+    print("Removed dict is", removed_dict)
     print(sum(removed_dict.values()))
     for fold in folds_list:
         data = pd.concat(fold)
+        index = data.index.tolist()
+        index_remove = index_to_be_removed.copy()
+        index_remove = [i for i in index_remove if i in index]
+        data = data.drop(labels=index_remove, axis=0)
         print(data.shape)
         folds.append(data)
-    if len(folds) == 0:
+    if len(folds) <= 1:
         print("all folds are ignored. Continue to next person")
         continue
 
     subject_preprocess_record[str(subject_id)]["folds_remained"] = len(folds)
 
-    subject_prediction[str(subject_id)] = {}
     models = zip(names, classifiers, dicts_records)
     for name, classifier, dicts_record in models:
         accuracy = 0
         t0 = time()
+        accuracy_list = []
         for i in range(len(folds_list)):
             folds.append(folds.pop(0))
             data = pd.concat(folds[:-1])
@@ -316,18 +334,13 @@ for i in range(subject_id_start, subject_id_end + 1):
             X_test = data_test.iloc[:, :-1]
             y_test = data_test.iloc[:, -1]
             y_predict = []
-            if name == "GradientBoosting":
-                y_predict = clf.predict(X_test)
-                # accuracy = accuracy + clf.score(X_test, y_test)
-                accuracy += metrics.accuracy_score(y_test, y_predict)
-            else:
-                y_predict = clf.predict(X_test)
-                if name == 'RandomForest':
-                    Random_Forest_predicted_y.extend(y_predict)
-                if name == 'RBF SVM':
-                    RBF_SVM_predicted_y.extend(y_predict)
-                # accuracy = accuracy + calculate_accuracy(y_test.tolist(), y_predict)
-                accuracy += metrics.accuracy_score(y_test, y_predict)
+            y_predict = clf.predict(X_test)
+            if name == 'RandomForest':
+                Random_Forest_predicted_y.extend(y_predict)
+            if name == 'RBF SVM':
+                RBF_SVM_predicted_y.extend(y_predict)
+            accuracy_list.append(metrics.accuracy_score(y_test, y_predict))
+            accuracy += metrics.accuracy_score(y_test, y_predict)
         t1 = time()
         time_elapsed = t1 - t0
         print()
@@ -336,12 +349,13 @@ for i in range(subject_id_start, subject_id_end + 1):
             time_classifier[name] = 0
         time_classifier[name] = time_classifier[name] + time_elapsed
         accuracy = accuracy / float(len(folds_list))
-        subject_prediction[str(subject_id)][name] = {}
-        subject_prediction[str(subject_id)][name]["acutual_y"] = y_test
-        subject_prediction[str(subject_id)][name]["predicted_y"] = y_predict
         dicts_record[str(subject_id)] = accuracy
+        standard_deviation_subject = calculate_sd(accuracy_list, accuracy)
+        standard_deviation_record[str(subject_id)] = standard_deviation_subject
         print("The accuracy of subject", subject_id,
               "is", accuracy, "with the model " + name)
+        print("The standard deviation of subject", subject_id,
+              "is", standard_deviation_subject, "with the model " + name)
 
     if INCLUDE_DL:
         for name in DL_Models:
@@ -370,20 +384,30 @@ for i in range(subject_id_start, subject_id_end + 1):
                 tcr_test = DL.EEGCogNet_DL(testdata)
                 test_loader = DataLoader(
                     dataset=tcr_test, batch_size=BATCH_SIZE, shuffle=False, num_workers=NUM_PROCESS)
-                cur_accuracy = test_loop(test_loader, model.net)
+                cur_accuracy = DL.test_loop(test_loader, model.net)
 
                 accs.append(cur_accuracy)
 
             t1 = time()
             time_elapsed = t1 - t0
             print()
+            time_classifier[name] = time_elapsed
             print("The time it takes to run " + name + " is", time_elapsed)
-            average_accuracy = sum(accs) / (float)len(folds_list)
+            average_accuracy = sum(accs) / (float)(len(folds_list))
+            if name == "CNN":
+                CNN[str(subject_id)] = average_accuracy
+            elif name == "LSTM":
+                LSTM[str(subject_id)] = average_accuracy
+            sd_dl = calculate_sd(accs, average_accuracy)
             print("The accuracy of subject", subject_id, "is",
                   average_accuracy, "with the model " + name)
+            print("The sstandard deviation of subject", subject_id, "is",
+                  round(sd_dl, 5), "with the model " + name)
 
 
 print("Dicts_order is:")
+print(dicts_records)
+print("="*10)
 for name, dicts_record in zip(names, dicts_records):
     print(name)
     print(dicts_record)
@@ -441,6 +465,53 @@ x_axis = subject_id_order
 
 print(x_axis)
 
+
+avg_accuracy = []
+time = []
+sd_classifier = []
+name_list = []
+print("The time_classifier is", time_classifier)
+print("The dict_sum_recorder is", dict_sum_recorder)
+print("Number of subjects is", len(subject_id_order))
+for ele in dict_sum_recorder:
+    pos_of_ele = names.index(ele)
+    list_of_accuracies_of_ele = dicts_records[pos_of_ele].values()
+    name_list.append(ele)
+    temp_avg = dict_sum_recorder[ele] / float(len(subject_id_order))
+    sd_classifier.append(round(calculate_sd(list_of_accuracies_of_ele, temp_avg),5))
+    avg_accuracy.append(round(temp_avg, 2))
+    temp_time = time_classifier[ele] / float(len(subject_id_order))
+    time.append(round(temp_time, 1))
+print()
+print("avg accuracy", avg_accuracy)
+print("time", time)
+print("name order", name_list)
+print("Standard Deviation of classifiers", sd_classifier)
+if INCLUDE_DL:
+    temp_avg_CNN = sum(CNN.values()) / float(len(CNN))
+    time_CNN = time_classifier["CNN"]
+    sd_CNN = calculate_sd(CNN.values(), temp_avg_CNN)
+    temp_avg_LSTM = sum(LSTM.values()) / float(len(LSTM))
+    time_LSTM = time_classifier["LSTM"]
+    sd_LSTM = calculate_sd(LSTM.values(), temp_avg_LSTM)
+    avg_accuracy.append(temp_avg_CNN)
+    avg_accuracy.append(temp_avg_LSTM)
+    time.append(time_CNN)
+    time.append(time_LSTM)
+    sd_classifier.append(sd_CNN)
+    sd_classifier.append(sd_LSTM)
+
+data = {'Average Accuracy': avg_accuracy, 'Avg code runtime(s)': time, 'Standard Deviation': sd_classifier}
+# Creates pandas DataFrame.
+if INCLUDE_DL:
+    df = pd.DataFrame(data, index=name_list + DL_Models)
+else:
+    df = pd.DataFrame(data, index=name_list)
+
+df = pd.DataFrame(data, index=name_list)
+df.to_csv(f"output/{data_source}/accuracy_runtime_classifier.csv")
+print(df)
+
 plt.figure(figsize=(10, 5))
 fig, ax = plt.subplots()
 for i in range(len(result_y_res)):
@@ -464,6 +535,5 @@ plt.xticks(fontsize=15)
 plt.yticks(fontsize=15)
 plt.xlabel('Subject ID orderd by ' + best_classifier_name, fontsize=15)
 plt.ylabel('Accuracy', fontsize=15)
-plt.savefig("output/"+data_source + "_" + data_status +
-            "results/algorithm_comparison_each_subject.jpg", bbox_inches='tight', dpi=2000)
+plt.savefig(f"output/{data_source}/algorithm_comparison_each_subject.jpg", bbox_inches='tight', dpi=2000)
 plt.show()

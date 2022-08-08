@@ -90,15 +90,15 @@ class DL_Model():
 
     self.epoch = epoch
     self.lr = lr
-    self.input_size = input_size
-    self.output_size = output_size
+    # self.input_size = input_size
+    # self.output_size = output_size
     self.batch_size = batch_size
 
-    if model == "cnn":
+    if model == "CNN":
       self.net = CNN(self.batch_size)
-    elif model == "lstm":
+    elif model == "LSTM":
       self.net = LSTM()
-    elif model == "transformer":
+    elif model == "Transformer":
       self.net = EEG_Transformer()
     else:
       raise ValueError("Choose a valid model")
@@ -108,7 +108,7 @@ class DL_Model():
 
   def fit(self, train_loader):
 
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     self.net.to(device)
 
     criterion = nn.CrossEntropyLoss()
@@ -146,14 +146,14 @@ class CNN(torch.nn.Module):
     #print(x.size(), "before")
     x = torch.unsqueeze(x, 1)
     #print(x.size(), "before")
-    x = self.conv(x.float())
+    x = self.conv(x.double())
     #print(x.size(), "before")
     x = self.batchNorm(x)
     #print(x.size(), "before")
     x = self.maxPool(x)
     #print(x.size(), "before")
     x = F.relu(x)
-    #print(x.size(), "before")
+    print(x.size(), "before")
     x = x.view(self.batch_size, -1)
     #print(x.size(), "after")
     x = self.fc(x)
