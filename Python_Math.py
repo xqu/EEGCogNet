@@ -17,6 +17,12 @@ data_folder_name = "Raw_Python_Math"
 
 plateau_threashold = 14
 
+task_num = 4
+ground_truth = 1
+distribution_list = {}
+while ground_truth <= task_num:
+    distribution_list[ground_truth] = 0
+    ground_truth += 1
 
 def combine_folds(folds_dict, fold_num):
     folds = []
@@ -29,7 +35,7 @@ def combine_folds(folds_dict, fold_num):
 
 ## checks if the file_name exists in the folder_name
 def check_file_exists(folder_name, file_name):
-    return os.path.exists("data/"+ folder_name + "/" + file_name)
+    return os.path.exists("data/Python-Math/"+ folder_name + "/" + file_name)
 
 
 # compares two rows to see if they are the same in the pandas dataframe
@@ -116,32 +122,51 @@ def calculate_sd(accuracies, mean):
     sum_of_accuracies /= len(accuracies) - 1
     return math.sqrt(sum_of_accuracies)
 
+def label_distribution(folds : list, subject_id : int):
+    for fold in folds:
+        for index, row in fold.iterrows():
+            ground_truth = row["y"]
+            distribution_list[ground_truth] += 1
+    print("label saved for subeject", subject_id)
+
+def label_distribution_save(distribution_list):
+    distribution_percentage = []
+    total = sum(distribution_list.values())
+    for key in distribution_list:
+        percentage = distribution_list[key] / total
+        distribution_percentage.append(round(percentage, 3))
+    data = {'Distribution  Number': distribution_list.values(), 'Distribution Percentage': distribution_percentage}
+    df = pd.DataFrame(data, index=distribution_list.keys())
+    df.index.name = 'Task Number'
+    df.to_csv(f"output/{data_folder_name}/{data_folder_name}_label_distribution.csv")
+    print(df)
+
 # define models to train
 names = [
     'XGBoost',
-    # 'GradientBoosting',
-    # 'LDA',
-    # 'Nearest Neighbors',
-    # 'AdaBoostClassifier',
-    # 'RandomForest',
-    # 'Linear SVM',
-    # 'RBF SVM',
-    # 'Decision Tree',
-    # 'Shrinkage LDA',
+    'GradientBoosting',
+    'LDA',
+    'Nearest Neighbors',
+    'AdaBoostClassifier',
+    'RandomForest',
+    'Linear SVM',
+    'RBF SVM',
+    'Decision Tree',
+    'Shrinkage LDA',
 ]
 
 # build classifiers
 classifiers = [
     XGBClassifier(eval_metric='mlogloss'),
-    # GradientBoostingClassifier(),
-    # LinearDiscriminantAnalysis(),
-    # KNeighborsClassifier(n_neighbors=4),
-    # AdaBoostClassifier(),
-    # RandomForestClassifier(n_estimators=300, max_features="sqrt", oob_score=True),
-    # SVC(kernel="linear", C=0.025),
-    # SVC(gamma=2, C=1),
-    # DecisionTreeClassifier(),
-    # LinearDiscriminantAnalysis(solver='lsqr', shrinkage='auto'),
+    GradientBoostingClassifier(),
+    LinearDiscriminantAnalysis(),
+    KNeighborsClassifier(n_neighbors=4),
+    AdaBoostClassifier(),
+    RandomForestClassifier(n_estimators=300, max_features="sqrt", oob_score=True),
+    SVC(kernel="linear", C=0.025),
+    SVC(gamma=2, C=1),
+    DecisionTreeClassifier(),
+    LinearDiscriminantAnalysis(solver='lsqr', shrinkage='auto'),
 ]
 
 subject_id_lst = [66, 76, 79, 81, 101, 102, 103, 104, 106, 107, 108, 109, 110, 111, 112]
@@ -156,8 +181,8 @@ session_task_order = {}
 session_task_order[1] = [1, 2, 3, 4]
 session_task_order[2] = [3, 4, 1, 2]
 
-subject_id_start = 4
-subject_id_end = 4  # Python_Math max 15
+subject_id_start = 1
+subject_id_end = 15  # Python_Math max 15
 
 subject_algorithms_dict = {}
 
@@ -177,9 +202,9 @@ for subject_id in range(subject_id_start, subject_id_end + 1):
         read_file = None
         if file_exists:
             if subject_id_num == 66 and session == 1:
-                read_file = pd.read_csv("data/" + data_folder_name + '/' + file_name, sep=",", header=None)
+                read_file = pd.read_csv("data/Python-Math/" + data_folder_name + '/' + file_name, sep=",", header=None)
             else:
-                read_file = pd.read_csv("data/" + data_folder_name + '/' + file_name, delim_whitespace=True, header=None)
+                read_file = pd.read_csv("data/Python-Math/" + data_folder_name + '/' + file_name, delim_whitespace=True, header=None)
             read_file = read_file.iloc[:, 1:]
             if len(read_file) > 12000:
                 read_file = read_file.iloc[:12000, :]
@@ -252,6 +277,8 @@ for subject_id in range(subject_id_start, subject_id_end + 1):
 
     accuracy_dict = {}
 
+    label_distribution(folds_dict.values(), subject_id)
+
     models = zip(names, classifiers)
     for name, classifier in models:
         accuracy = 0
@@ -274,7 +301,10 @@ for subject_id in range(subject_id_start, subject_id_end + 1):
 
     subject_algorithms_dict[subject_id] = accuracy_dict
 
-print(subject_algorithms_dict)
+
+label_distribution_save(distribution_list)
+
+print("subject_algorithms_dict is", subject_algorithms_dict)
 
 algorithm_sum_dict = {}
 for name in names:
@@ -294,6 +324,26 @@ print("subject id order is", subject_id_order)
 
 for key in algorithm_sum_dict:
     algorithm_sum_dict[key] /= len(subject_id_order)
+
+print("algorithm_sum_dict is", algorithm_sum_dict)
+
+
+# Create a CSV file
+avg_accuracy = []
+sd_classifier = []
+for name in names:
+    list_of_accuracy_name = []
+    for subject_id in subject_algorithms_dict:
+        list_of_accuracy_name.append(subject_algorithms_dict[subject_id][name])
+    avg = algorithm_sum_dict[name]
+    sd_name = calculate_sd(list_of_accuracy_name, avg)
+    avg_accuracy.append(round(avg,2))
+    sd_classifier.append(round(sd_name,5))
+
+data = {'Average Accuracy': avg_accuracy, 'Standard Deviation': sd_classifier}
+df = pd.DataFrame(data, index=names)
+df.to_csv(f"output/{data_folder_name}/accuracy_runtime_classifier.csv")
+print(df)
 
 # x_axis = np.arange(len(subject_id_order))
 x_axis = list(range(len(subject_id_order)))

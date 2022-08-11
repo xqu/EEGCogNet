@@ -8,6 +8,8 @@ from sklearn.neighbors import KNeighborsClassifier
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.svm import SVC
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
+from xgboost import XGBClassifier
+import math
 # metrics are used to find accuracy or error
 from sklearn import metrics
 
@@ -15,6 +17,12 @@ data_folder_name = "GRE_Raw"
 
 plateau_threashold = 14
 
+task_num = 4
+ground_truth = 1
+distribution_list = {}
+while ground_truth <= task_num:
+    distribution_list[ground_truth] = 0
+    ground_truth += 1
 
 def combine_folds(folds_dict, fold_num):
     folds = []
@@ -27,7 +35,7 @@ def combine_folds(folds_dict, fold_num):
 
 # checks if the file_name exists in the folder_name
 def check_file_exists(folder_name, file_name):
-    return os.path.exists("data/" + folder_name + "/" + file_name)
+    return os.path.exists("data/GRE-Relax/" + folder_name + "/" + file_name)
 
 
 # compares two rows to see if they are the same in the pandas dataframe
@@ -108,9 +116,36 @@ def session_ground_truth(order, last_task_left):
     res_lst.extend([order[-1]] * last_task_left)
     return res_lst
 
+def calculate_sd(accuracies, mean):
+    sum_of_accuracies = 0
+    for acc in accuracies:
+        sum_of_accuracies += pow(acc-mean, 2)
+    sum_of_accuracies /= len(accuracies) - 1
+    return math.sqrt(sum_of_accuracies)
+
+def label_distribution(folds : list, subject_id : int):
+    for fold in folds:
+        for index, row in fold.iterrows():
+            ground_truth = row["y"]
+            distribution_list[ground_truth] += 1
+    print("label saved for subeject", subject_id)
+
+def label_distribution_save(distribution_list):
+    distribution_percentage = []
+    total = sum(distribution_list.values())
+    for key in distribution_list:
+        percentage = distribution_list[key] / total
+        distribution_percentage.append(round(percentage, 3))
+    data = {'Distribution  Number': distribution_list.values(), 'Distribution Percentage': distribution_percentage}
+    df = pd.DataFrame(data, index=distribution_list.keys())
+    df.index.name = 'Task Number'
+    df.to_csv(f"output/{data_folder_name}/{data_folder_name}_label_distribution.csv")
+    print(df)
+
 
 # define models to train
 names = [
+    'XGBoost',
     'GradientBoosting',
     'LDA',
     'Nearest Neighbors',
@@ -124,6 +159,7 @@ names = [
 
 # build classifiers
 classifiers = [
+    XGBClassifier(eval_metric='mlogloss'),
     GradientBoostingClassifier(),
     LinearDiscriminantAnalysis(),
     KNeighborsClassifier(n_neighbors=4),
@@ -175,7 +211,7 @@ for subject_id in range(subject_id_start, subject_id_end + 1):
         read_file = None
         if file_exists:
             read_file = pd.read_csv(
-                "data/" + data_folder_name + '/' + file_name, delim_whitespace=True, header=None)
+                "data/GRE-Relax/" + data_folder_name + '/' + file_name, delim_whitespace=True, header=None)
             read_file = read_file.iloc[:, 1:]
             if len(read_file) > 12000:
                 read_file = read_file.iloc[:12000, :]
@@ -265,6 +301,8 @@ for subject_id in range(subject_id_start, subject_id_end + 1):
 
     accuracy_dict = {}
 
+    label_distribution(folds_dict.values(), subject_id)
+
     models = zip(names, classifiers)
     for name, classifier in models:
         accuracy = 0
@@ -278,16 +316,14 @@ for subject_id in range(subject_id_start, subject_id_end + 1):
             X_test = data_test.iloc[:, :-1]
             y_test = data_test.iloc[:, -1]
             y_predict = []
-            if name == "GradientBoostingRegressor":
-                accuracy += clf.score(X_test, y_test)
-            else:
-                y_predict = clf.predict(X_test)
-                accuracy += metrics.accuracy_score(y_test, y_predict)
+            y_predict = clf.predict(X_test)
+            accuracy += metrics.accuracy_score(y_test, y_predict)
         accuracy_dict[name] = accuracy / len(folds_dict)
 
     subject_algorithms_dict[subject_id] = accuracy_dict
 
-print(subject_algorithms_dict)
+label_distribution_save(distribution_list)
+print("subject_algorithms_dict is", subject_algorithms_dict)
 
 algorithm_sum_dict = {}
 for name in names:
@@ -308,6 +344,25 @@ print("subject id order is", subject_id_order)
 
 for key in algorithm_sum_dict:
     algorithm_sum_dict[key] /= len(subject_id_order)
+
+print("algorithm_sum_dict is", algorithm_sum_dict)
+
+# Create a CSV file
+avg_accuracy = []
+sd_classifier = []
+for name in names:
+    list_of_accuracy_name = []
+    for subject_id in subject_algorithms_dict:
+        list_of_accuracy_name.append(subject_algorithms_dict[subject_id][name])
+    avg = algorithm_sum_dict[name]
+    sd_name = calculate_sd(list_of_accuracy_name, avg)
+    avg_accuracy.append(round(avg,2))
+    sd_classifier.append(round(sd_name,5))
+
+data = {'Average Accuracy': avg_accuracy, 'Standard Deviation': sd_classifier}
+df = pd.DataFrame(data, index=names)
+df.to_csv(f"output/{data_folder_name}/accuracy_runtime_classifier.csv")
+print(df)
 
 # x_axis = np.arange(len(subject_id_order))
 x_axis = list(range(len(subject_id_order)))

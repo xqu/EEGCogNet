@@ -23,6 +23,7 @@ DL_Models = ['CNN', 'LSTM']
 #####################
 
 data_source = 'RWT'
+task_num = 5 # Number of tasks
 subject_id_start = 1
 subject_id_end = 14  # tcr's max 17; rwt's max 14
 tcr_subject = [7, 112, 113, 121, 75, 107, 79, 82,
@@ -30,10 +31,16 @@ tcr_subject = [7, 112, 113, 121, 75, 107, 79, 82,
 rwt_subject = [7, 112, 113, 114, 75, 107, 79, 82, 118, 76, 115, 117, 119, 120]
 subject = None
 
-if data_source == 'tcr':
+if data_source == 'TCR':
     subject = tcr_subject
 else:
     subject = rwt_subject
+
+ground_truth = 1
+distribution_list = {}
+while ground_truth <= task_num:
+    distribution_list[ground_truth] = 0
+    ground_truth += 1
 
 first_chopped_off = 600 * 0.3
 last_chopped_off = 600 * 0
@@ -140,6 +147,25 @@ def calculate_sd(accuracies, mean):
         sum_of_accuracies += pow(acc-mean, 2)
     sum_of_accuracies /= len(accuracies) - 1
     return math.sqrt(sum_of_accuracies)
+
+def label_distribution(folds : list, subject_id : int):
+    for fold in folds:
+        for index, row in fold.iterrows():
+            ground_truth = row["ground_truth"]
+            distribution_list[ground_truth] += 1
+    print("label saved for subeject", subject_id)
+
+def label_distribution_save(distribution_list):
+    distribution_percentage = []
+    total = sum(distribution_list.values())
+    for key in distribution_list:
+        percentage = distribution_list[key] / total
+        distribution_percentage.append(round(percentage, 3))
+    data = {'Distribution  Number': distribution_list.values(), 'Distribution Percentage': distribution_percentage}
+    df = pd.DataFrame(data, index=distribution_list.keys())
+    df.index.name = 'Task Number'
+    df.to_csv(f"output/{data_source}/{data_source}_label_distribution.csv")
+    print(df)
 
 print(len(subject))
 
@@ -311,6 +337,8 @@ for i in range(subject_id_start, subject_id_end + 1):
 
     subject_preprocess_record[str(subject_id)]["folds_remained"] = len(folds)
 
+    label_distribution(folds, subject_id)
+
     models = zip(names, classifiers, dicts_records)
     for name, classifier, dicts_record in models:
         accuracy = 0
@@ -401,6 +429,8 @@ for i in range(subject_id_start, subject_id_end + 1):
             print("The standard deviation of subject", subject_id, "is",
                   round(sd_dl, 5), "with the model " + name)
 
+
+label_distribution_save(distribution_list)
 
 print("Dicts_order is:")
 print(dicts_records)

@@ -19,12 +19,13 @@ from sklearn import metrics
 #####################
 BATCH_SIZE = 64  # Choose batch size for deep learning training process
 NUM_PROCESS = 2  # Choose how many CPU cores are used for training neural networks
-INCLUDE_DL = True  # Choose whether to run DL benchmark. This requires PyTorch
+INCLUDE_DL = False  # Choose whether to run DL benchmark. This requires PyTorch
 # Currently also support attention-based transformer, simply add 'transformer' to this list.
 DL_Models = ['CNN', 'LSTM']
 #####################
 
 data_source = 'TCR'
+task_num = 5
 subject_id_start = 1
 subject_id_end = 17  # tcr's max 17; rwt's max 14
 tcr_subject = [7, 112, 113, 121, 75, 107, 79, 82,
@@ -32,10 +33,17 @@ tcr_subject = [7, 112, 113, 121, 75, 107, 79, 82,
 rwt_subject = [7, 112, 113, 114, 75, 107, 79, 82, 118, 76, 115, 117, 119, 120]
 subject = None
 
-if data_source == 'tcr':
+if data_source == 'TCR':
     subject = tcr_subject
 else:
     subject = rwt_subject
+
+
+ground_truth = 1
+distribution_list = {}
+while ground_truth <= task_num:
+    distribution_list[ground_truth] = 0
+    ground_truth += 1
 
 first_chopped_off = 600 * 0.3
 last_chopped_off = 600 * 0
@@ -143,6 +151,40 @@ def calculate_sd(accuracies, mean):
         sum_of_accuracies += pow(acc-mean, 2)
     sum_of_accuracies /= len(accuracies) - 1
     return math.sqrt(sum_of_accuracies)
+
+# Truncate each folds to make sure the length of each folds is the multiple of the BATCH_SIZE
+def folds_truncate(folds):
+    folds_DL = []
+    for ele in folds:
+        ele = ele.reset_index(drop=True)
+        print("The shape of each fold in DL model before is", ele.shape)
+        num_of_batches = len(ele.index) // BATCH_SIZE
+        fold_truncate_after = BATCH_SIZE * num_of_batches - 1
+        print("fold_truncate_after is", fold_truncate_after)
+        ele = ele.truncate(before=0, after=fold_truncate_after)
+        folds_DL.append(ele)
+        print("The length of each fold in DL model after is", ele.shape)
+        print("=" * 8)
+    return folds_DL
+
+def label_distribution(folds : list, subject_id):
+    for fold in folds:
+        for index, row in fold.iterrows():
+            ground_truth = row["ground_truth"]
+            distribution_list[ground_truth] += 1
+    print("label saved for subeject", subject_id)
+
+def label_distribution_save(distribution_list):
+    distribution_percentage = []
+    total = sum(distribution_list.values())
+    for key in distribution_list:
+        percentage = distribution_list[key] / total
+        distribution_percentage.append(round(percentage,3))
+    data = {'Distribution  Number': distribution_list.values(), 'Distribution Percentage': distribution_percentage}
+    df = pd.DataFrame(data, index=distribution_list.keys())
+    df.index.name = 'Task Number'
+    df.to_csv(f"output/{data_source}/{data_source}_label_distribution.csv")
+    print(df)
 
 print(len(subject))
 
@@ -314,6 +356,8 @@ for i in range(subject_id_start, subject_id_end + 1):
 
     subject_preprocess_record[str(subject_id)]["folds_remained"] = len(folds)
 
+    label_distribution(folds, subject_id)
+
     models = zip(names, classifiers, dicts_records)
     for name, classifier, dicts_record in models:
         accuracy = 0
@@ -358,6 +402,7 @@ for i in range(subject_id_start, subject_id_end + 1):
               "is", standard_deviation_subject, "with the model " + name)
 
     if INCLUDE_DL:
+        folds = folds_truncate(folds)
         for name in DL_Models:
             accs = []
             t0 = time()
@@ -365,6 +410,8 @@ for i in range(subject_id_start, subject_id_end + 1):
             for i in range(len(folds_list)):
 
                 folds.append(folds.pop(0))
+                print("inside DL model, length of first fold", folds[0].shape)
+
                 data = pd.concat(folds[:-1])
                 index = data.index.tolist()
                 index_remove = index_to_be_removed.copy()
@@ -404,6 +451,8 @@ for i in range(subject_id_start, subject_id_end + 1):
             print("The sstandard deviation of subject", subject_id, "is",
                   round(sd_dl, 5), "with the model " + name)
 
+
+label_distribution_save(distribution_list)
 
 print("Dicts_order is:")
 print(dicts_records)
